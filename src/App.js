@@ -17,6 +17,7 @@ const musicCollections = [
     genre: "Lo-Fi",
     tracks: 45,
     file: "/music/music.mp3",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55kwoil2f5GkeGaYXjYTpOJAUkQPOtl9DJg&s",
     trackList: [
       { id: 1, name: "Midnight Study", artist: "Chill Vibes" },
       { id: 2, name: "Focus Mode", artist: "Lo-Fi Master",},
@@ -33,6 +34,7 @@ const musicCollections = [
     genre: "Jazz",
     tracks: 52,
     file: "/music/music.mp3",
+    image: "https://play-lh.googleusercontent.com/hrxOd5O72LJlsn2UyTcxDJZOW4h33JpaPOnc0Qp3oTX1m09TcQmmiVNZWp-u4Ld3xA",
     trackList: [
       { id: 1, name: "Smooth Saxophone", artist: "Miles Davis" },
       { id: 2, name: "Evening Groove", artist: "John Coltrane" },
@@ -49,6 +51,7 @@ const musicCollections = [
     genre: "Ambient",
     tracks: 38,
     file: "/music/music.mp3",
+    image: "https://blog.landr.com/wp-content/uploads/2025/08/How-to-Make-Ambient-Music.png",
     trackList: [
       { id: 1, name: "Peaceful Waves", artist: "Ambient One" },
       { id: 2, name: "Ethereal Skies", artist: "Relaxation Pro" },
@@ -65,6 +68,7 @@ const musicCollections = [
     genre: "Classical",
     tracks: 48,
     file: "/music/music.mp3",
+    image: "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=500&h=500&fit=crop",
     trackList: [
       { id: 1, name: "Moonlight Sonata", artist: "Ludwig van Beethoven" },
       { id: 2, name: "The Four Seasons", artist: "Antonio Vivaldi" },
@@ -272,7 +276,9 @@ function AppContent() {
                 >
                   <div className="project-image-container">
                     <div className="music-cover" style={{
-                      background: `linear-gradient(135deg, hsl(${collection.id * 45}deg, 70%, 50%), hsl(${collection.id * 45 + 60}deg, 70%, 60%))`,
+                      backgroundImage: `url('${collection.image}')`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
                       width: '100%',
                       height: '250px',
                       display: 'flex',
@@ -280,9 +286,20 @@ function AppContent() {
                       justifyContent: 'center',
                       fontSize: '4rem',
                       borderRadius: '8px 8px 0 0',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      position: 'relative'
                     }}>
-                      🎵
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                        borderRadius: '8px 8px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        🎵
+                      </div>
                     </div>
                   </div>
 
