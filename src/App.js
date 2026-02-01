@@ -5,8 +5,14 @@ import { useEffect, useState, useRef } from 'react';
 // Hero removed — landing goes straight to collections
 import CollectionDetail from './components/CollectionDetail';
 import ThemeSwitcher from './components/ThemeSwitcher';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
+function formatNameFromFile(filename) {
+  const name = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+  return name.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
+
+const popFiles = ['betterwhenimdancing.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3'];
 
 const musicCollections = [
   {
@@ -17,7 +23,7 @@ const musicCollections = [
     genre: "Lo-Fi",
     tracks: 45,
     file: "/music/music.mp3",
-    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55kwoil2f5GkeGaYXjYTpOJAUkQPOtl9DJg&s",
+    image: "https://i.ytimg.com/vi/CFGLoQIhmow/maxresdefault.jpg",
     trackList: [
       { id: 1, name: "Midnight Study", artist: "Chill Vibes" },
       { id: 2, name: "Focus Mode", artist: "Lo-Fi Master",},
@@ -28,20 +34,14 @@ const musicCollections = [
   },
   {
     id: 2,
-    title: "Midnight Jazz",
-    artist: "Jazz Masters",
-    description: "Smooth jazz collection for evening ambiance.",
-    genre: "Jazz",
-    tracks: 52,
+    title: "Pop Playlist",
+    artist: "Your Music",
+    description: "Pop songs from your local /public/music folder.",
+    genre: "Pop",
+    tracks: popFiles.length,
     file: "/music/music.mp3",
-    image: "https://play-lh.googleusercontent.com/hrxOd5O72LJlsn2UyTcxDJZOW4h33JpaPOnc0Qp3oTX1m09TcQmmiVNZWp-u4Ld3xA",
-    trackList: [
-      { id: 1, name: "Smooth Saxophone", artist: "Miles Davis" },
-      { id: 2, name: "Evening Groove", artist: "John Coltrane" },
-      { id: 3, name: "Blue Mood", artist: "Bill Evans" },
-      { id: 4, name: "Jazz Classic", artist: "Duke Ellington" },
-      { id: 5, name: "Night Melody", artist: "Thelonious Monk" },
-    ]
+    image: "https://cdn-images.dzcdn.net/images/cover/9eb5f9334e7bfed5aae9701e76265298/0x1900-000000-80-0-0.jpg",
+    trackList: popFiles.map((f, i) => ({ id: i + 1, name: formatNameFromFile(f), artist: 'Pop', file: `/music/${encodeURIComponent(f)}` }))
   },
   {
     id: 3,
@@ -87,37 +87,8 @@ function AppContent() {
   const [selectedCollection, setSelectedCollection] = useState(null);
   const audioRef = useRef(null);
   // default to collections since Hero removed
-  const [activeSection, setActiveSection] = useState('collection');
 
-  // Function to handle smooth scroll
-  const scrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-      setActiveSection(sectionId);
-    }
-  };
 
-  // Update active section based on scroll position
-    useEffect(() => {
-    const handleScroll = () => {
-    const sections = ['home', 'collection'];
-      const currentSection = sections.find(section => {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          return rect.top <= 100 && rect.bottom >= 100;
-        }
-        return false;
-      });
-      if (currentSection) {
-        setActiveSection(currentSection);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   useEffect(() => {
     audioRef.current = new Audio('/music/music.mp3');
@@ -271,7 +242,12 @@ function AppContent() {
                     y: -5,
                     transition: { duration: 0.2 }
                   }}
-                  onClick={() => setSelectedCollection(collection)}
+                  onClick={() => {
+                    if (audioRef.current) {
+                      audioRef.current.pause();
+                    }
+                    setSelectedCollection(collection);
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="project-image-container">
@@ -297,9 +273,7 @@ function AppContent() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
-                      }}>
-                        🎵
-                      </div>
+                      }} />
                     </div>
                   </div>
 
