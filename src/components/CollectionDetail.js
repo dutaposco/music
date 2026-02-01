@@ -1,11 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 const CollectionDetail = ({ collection, onBack }) => {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isLooping = true; // always loop
+  const audioRef = useRef(null);
 
-  const currentTrack = collection.trackList[currentTrackIndex];
+  const currentTrack = collection.trackList[currentTrackIndex] || collection.trackList[0] || { name: '', artist: '' };
+
+  useEffect(() => {
+    audioRef.current = new Audio();
+    audioRef.current.volume = 0.8;
+
+    const handleEnded = () => {
+      setCurrentTrackIndex(prev => {
+        if (prev < collection.trackList.length - 1) {
+          setIsPlaying(true);
+          return prev + 1;
+        } else {
+          // always loop back to first track
+          setIsPlaying(true);
+          return 0;
+        }
+      });
+    }; 
+
+    audioRef.current.addEventListener('ended', handleEnded);
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener('ended', handleEnded);
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+    };
+  }, [collection.trackList.length, isLooping]);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const track = collection.trackList[currentTrackIndex];
+    if (!track) {
+      audioRef.current.pause();
+      return;
+    }
+    if (isPlaying) {
+      audioRef.current.src = track.file || '/music/music.mp3';
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.pause();
+    }
+  }, [currentTrackIndex, isPlaying, collection.trackList]);
 
   const handlePlayTrack = (index) => {
     setCurrentTrackIndex(index);
@@ -24,9 +70,7 @@ const CollectionDetail = ({ collection, onBack }) => {
     }
   };
 
-  const getGradientColor = () => {
-    return `linear-gradient(135deg, hsl(${collection.id * 45}deg, 70%, 50%), hsl(${collection.id * 45 + 60}deg, 70%, 60%))`;
-  };
+
 
   return (
     <>
@@ -191,6 +235,8 @@ const CollectionDetail = ({ collection, onBack }) => {
                 Next ⏭️
               </button>
             </div>
+
+
 
             {/* Duration Display removed - durations are not shown */}
           </motion.div>
