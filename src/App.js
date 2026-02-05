@@ -63,7 +63,8 @@ function AppContent() {
         audioRef.current = null;
       }
     };
-  }, [popCollection.trackList.length, isLooping]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLooping]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -78,7 +79,8 @@ function AppContent() {
     } else {
       audioRef.current.pause();
     }
-  }, [currentTrackIndex, isPlaying, popCollection.trackList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrackIndex, isPlaying]);
 
   const handleMusicChoice = (choice) => {
     setShowMusicModal(false);
@@ -111,11 +113,11 @@ function AppContent() {
         {/* Navbar */}
         <nav className="navbar">
           <div className="navbar-container">
-            <a href="#" className="nav-logo">
+            <div className="nav-logo" onClick={(e) => e.preventDefault()}>
               <div className="nav-logo-photo">
                 🎵 Pop Playlist
               </div>
-            </a>
+            </div>
             <div className="nav-right" style={{ marginLeft: 'auto' }}>
               <div className="nav-theme-item">
                 <ThemeSwitcher />
