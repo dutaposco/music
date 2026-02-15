@@ -30,7 +30,7 @@ function AppContent() {
   const [showMusicModal, setShowMusicModal] = useState(true);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const isLooping = true;
+  const [isLooping, setIsLooping] = useState(false);
   const audioRef = useRef(null);
 
   const currentTrack = popCollection.trackList[currentTrackIndex] || popCollection.trackList[0] || { name: '', artist: '' };
@@ -42,15 +42,22 @@ function AppContent() {
     audioRef.current.volume = 0.8;
 
     const handleEnded = () => {
-      setCurrentTrackIndex(prev => {
-        if (prev < popCollection.trackList.length - 1) {
-          setIsPlaying(true);
-          return prev + 1;
-        } else {
-          setIsPlaying(true);
-          return 0;
-        }
-      });
+      if (isLooping) {
+        // Jika loop enabled, restart track saat ini
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
+      } else {
+        // Jika tidak, mainkan track berikutnya
+        setCurrentTrackIndex(prev => {
+          if (prev < popCollection.trackList.length - 1) {
+            setIsPlaying(true);
+            return prev + 1;
+          } else {
+            setIsPlaying(true);
+            return 0;
+          }
+        });
+      }
     };
 
     audioRef.current.addEventListener('ended', handleEnded);
@@ -104,6 +111,10 @@ function AppContent() {
     if (currentTrackIndex > 0) {
       setCurrentTrackIndex(currentTrackIndex - 1);
     }
+  };
+
+  const handleToggleLoop = () => {
+    setIsLooping(!isLooping);
   };
 
   return (
@@ -282,6 +293,33 @@ function AppContent() {
                 }}
               >
                 Next ⏭️
+              </button>
+
+              <button
+                onClick={handleToggleLoop}
+                style={{
+                  padding: '0.8rem 1.2rem',
+                  background: isLooping ? 'linear-gradient(135deg, #00eaff, #00b4ff)' : 'rgba(0, 234, 255, 0.2)',
+                  border: isLooping ? '2px solid #00eaff' : '2px solid #00eaff',
+                  borderRadius: '8px',
+                  color: isLooping ? '#000' : '#00eaff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLooping) {
+                    e.currentTarget.style.background = 'rgba(0, 234, 255, 0.4)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isLooping) {
+                    e.currentTarget.style.background = 'rgba(0, 234, 255, 0.2)';
+                  }
+                }}
+              >
+                🔁 Loop {isLooping ? 'ON' : 'OFF'}
               </button>
             </div>
           </motion.div>
