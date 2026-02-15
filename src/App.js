@@ -10,7 +10,7 @@ function formatNameFromFile(filename) {
   return name.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
 }
 
-const popFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3'];
+const popFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3', 'k.mp3', 'apocalypse.mp3', 'johnwayne.mp3', 'heavenly.mp3', 'cry .mp3'];
 
 const popCollection = {
   id: 2,
