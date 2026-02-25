@@ -1,460 +1,499 @@
 import './App.css';
-import { motion, useScroll, useSpring } from 'framer-motion';
+import { motion, useScroll, useSpring, AnimatePresence } from 'framer-motion';
 import { ParallaxProvider } from 'react-scroll-parallax';
 import { useEffect, useState, useRef } from 'react';
-import ThemeSwitcher from './components/ThemeSwitcher';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { FaPlay, FaPause, FaStepForward, FaStepBackward, FaRetweet, FaMusic, FaSearch, FaChevronRight } from 'react-icons/fa';
 
 function formatNameFromFile(filename) {
   const name = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
   return name.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
 }
 
-const popFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3', 'k.mp3', 'apocalypse.mp3', 'johnwayne.mp3', 'heavenly.mp3', 'cry .mp3', 'lovemenot.mp3', 'titik.mp3', 'spontan.mp3'];
-
-const popCollection = {
-  id: 2,
-  title: "Pop Playlist",
-  artist: "Your Music",
-  description: "Pop songs from your local /public/music folder.",
-  genre: "Pop",
-  tracks: popFiles.length,
-  file: "/music/music.mp3",
-  image: "https://cdn-images.dzcdn.net/images/cover/9eb5f9334e7bfed5aae9701e76265298/0x1900-000000-80-0-0.jpg",
-  trackList: popFiles.map((f, i) => ({ id: i + 1, name: formatNameFromFile(f), artist: 'Pop', file: `/music/${encodeURIComponent(f)}` }))
-};
+// Default local collection
+const initialPopFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3', 'k.mp3', 'apocalypse.mp3', 'johnwayne.mp3', 'heavenly.mp3', 'cry .mp3', 'lovemenot.mp3', 'titik.mp3', 'spontan.mp3'];
+const localTracks = initialPopFiles.map((f, i) => ({
+  id: `local-${i}`,
+  name: formatNameFromFile(f),
+  artist: 'Local Track',
+  file: `/music/${encodeURIComponent(f)}`,
+  image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&auto=format&fit=crop&q=60'
+}));
 
 function AppContent() {
   const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress);
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+
   const [showMusicModal, setShowMusicModal] = useState(true);
+  const [tracks, setTracks] = useState(localTracks);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
   const audioRef = useRef(null);
 
-  const currentTrack = popCollection.trackList[currentTrackIndex] || popCollection.trackList[0] || { name: '', artist: '' };
+  const currentTrack = tracks[currentTrackIndex] || tracks[0];
 
+  // Search Function
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
 
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchQuery)}&entity=song&limit=30`);
+      const data = await response.json();
+
+      const searchResults = data.results.map(item => ({
+        id: item.trackId,
+        name: item.trackName,
+        artist: item.artistName,
+        file: item.previewUrl,
+        image: item.artworkUrl100.replace('100x100', '400x400'),
+        album: item.collectionName
+      }));
+
+      if (searchResults.length > 0) {
+        setTracks(searchResults);
+        setCurrentTrackIndex(0);
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const resetToLocal = () => {
+    setTracks(localTracks);
+    setCurrentTrackIndex(0);
+    setSearchQuery('');
+  };
 
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.volume = 0.8;
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.volume = 0.8;
+    }
 
+    const audio = audioRef.current;
+
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleEnded = () => {
       if (isLooping) {
-        // Jika loop enabled, restart track saat ini
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
+        audio.currentTime = 0;
+        audio.play().catch(() => { });
       } else {
-        // Jika tidak, mainkan track berikutnya
-        setCurrentTrackIndex(prev => {
-          if (prev < popCollection.trackList.length - 1) {
-            setIsPlaying(true);
-            return prev + 1;
-          } else {
-            setIsPlaying(true);
-            return 0;
-          }
-        });
+        handleNextTrack();
       }
     };
 
-    audioRef.current.addEventListener('ended', handleEnded);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('ended', handleEnded);
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
-      }
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLooping]);
 
   useEffect(() => {
-    if (!audioRef.current) return;
-    const track = popCollection.trackList[currentTrackIndex];
-    if (!track) {
-      audioRef.current.pause();
-      return;
-    }
-    if (isPlaying) {
-      audioRef.current.src = track.file || '/music/music.mp3';
-      audioRef.current.play().catch(() => {});
-    } else {
-      audioRef.current.pause();
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const track = tracks[currentTrackIndex];
+    if (track) {
+      const wasPlaying = isPlaying;
+      audio.src = track.file;
+      if (wasPlaying) {
+        audio.play().catch(() => setIsPlaying(false));
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrackIndex, isPlaying]);
+  }, [currentTrackIndex, tracks]);
 
-  const handleMusicChoice = (choice) => {
-    setShowMusicModal(false);
-    if (choice) {
-      setIsPlaying(true);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.play().catch(() => setIsPlaying(false));
+    } else {
+      audio.pause();
     }
-  };
+  }, [isPlaying]);
 
-  const handlePlayTrack = (index) => {
-    setCurrentTrackIndex(index);
+  const handleNextTrack = () => {
+    setCurrentTrackIndex(prev => (prev < tracks.length - 1 ? prev + 1 : 0));
     setIsPlaying(true);
   };
 
-  const handleNextTrack = () => {
-    if (currentTrackIndex < popCollection.trackList.length - 1) {
-      setCurrentTrackIndex(currentTrackIndex + 1);
-    }
-  };
-
   const handlePrevTrack = () => {
-    if (currentTrackIndex > 0) {
-      setCurrentTrackIndex(currentTrackIndex - 1);
+    setCurrentTrackIndex(prev => (prev > 0 ? prev - 1 : tracks.length - 1));
+    setIsPlaying(true);
+  };
+
+  const handleSeek = (e) => {
+    const time = Number(e.target.value);
+    setCurrentTime(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
     }
   };
 
-  const handleToggleLoop = () => {
-    setIsLooping(!isLooping);
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   return (
-    <ParallaxProvider>
-      <div className="gradient-overlay"></div>
-      <div className="App">
-        {/* Navbar */}
-        <nav className="navbar">
-          <div className="navbar-container">
-            <div className="nav-logo" onClick={(e) => e.preventDefault()}>
-              <div className="nav-logo-photo">
-                🎵 Pop Playlist
-              </div>
-            </div>
-            <div className="nav-right" style={{ marginLeft: 'auto' }}>
-              <div className="nav-theme-item">
-                <ThemeSwitcher />
-              </div>
-            </div>
-          </div>
-        </nav>
+    <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-cyan-500/30">
+      {/* Background Gradient Orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse delay-1000" />
+      </div>
 
-        {/* Music Modal */}
-        {showMusicModal && (
-          <div className="music-modal-overlay">
-            <div className="music-modal">
-              <div className="music-modal-content">
-                <h3>🎵 Play Music?</h3>
-                <p>Would you like to play music?</p>
-                <div className="music-modal-buttons">
-                  <button 
-                    className="music-btn music-btn-yes"
-                    onClick={() => handleMusicChoice(true)}
-                  >
-                    Yes
-                  </button>
-                  <button 
-                    className="music-btn music-btn-no"
-                    onClick={() => handleMusicChoice(false)}
-                  >
-                    No
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Progress Bar */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-500 z-50 origin-left"
+        style={{ scaleX }}
+      />
 
-        {/* Progress Bar */}
-        <motion.div 
-          className="progress-bar"
-          style={{
-            scaleX,
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: 'var(--primary-color)',
-            transformOrigin: '0%',
-            zIndex: 1001
-          }}
-        />
-
-        {/* Music Player Section */}
-        <section id="player" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-          {/* Now Playing */}
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-8 lg:py-16">
+        {/* Header */}
+        <header className="flex flex-col md:flex-row justify-between items-center gap-8 mb-16">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            style={{
-              maxWidth: '800px',
-              width: '100%',
-              padding: '2rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '2px solid rgba(0, 234, 255, 0.3)',
-              borderRadius: '16px',
-              backdropFilter: 'blur(10px)',
-              textAlign: 'center'
-            }}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={resetToLocal}
           >
-            <h3 style={{
-              fontSize: '1.2rem',
-              marginBottom: '1rem',
-              color: 'rgba(255, 255, 255, 0.8)'
-            }}>
-              Now Playing
-            </h3>
-            <div style={{
-              fontSize: '2.5rem',
-              marginBottom: '1.5rem'
-            }}>
-              ▶️
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <FaMusic className="text-slate-950 text-xl" />
             </div>
-            <h2 style={{
-              fontSize: '2rem',
-              fontWeight: 900,
-              margin: '0 0 0.5rem 0'
-            }}>
-              {currentTrack.name}
-            </h2>
-            <p style={{
-              fontSize: '1.1rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              margin: '0 0 1.5rem 0'
-            }}>
-              {currentTrack.artist}
-            </p>
-
-            {/* Player Controls */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <button
-                onClick={handlePrevTrack}
-                disabled={currentTrackIndex === 0}
-                style={{
-                  padding: '0.8rem 1.2rem',
-                  background: 'rgba(0, 234, 255, 0.2)',
-                  border: '2px solid #00eaff',
-                  borderRadius: '8px',
-                  color: '#00eaff',
-                  fontWeight: 600,
-                  cursor: currentTrackIndex === 0 ? 'not-allowed' : 'pointer',
-                  opacity: currentTrackIndex === 0 ? 0.5 : 1,
-                  fontSize: '1rem',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ⏮️ Previous
-              </button>
-
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                style={{
-                  padding: '1rem 2rem',
-                  background: 'linear-gradient(135deg, #00eaff, #00b4ff)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  transition: 'all 0.3s ease',
-                  minWidth: '140px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              >
-                {isPlaying ? '⏸️ Pause' : '▶️ Play'}
-              </button>
-
-              <button
-                onClick={handleNextTrack}
-                disabled={currentTrackIndex === popCollection.trackList.length - 1}
-                style={{
-                  padding: '0.8rem 1.2rem',
-                  background: 'rgba(0, 234, 255, 0.2)',
-                  border: '2px solid #00eaff',
-                  borderRadius: '8px',
-                  color: '#00eaff',
-                  fontWeight: 600,
-                  cursor: currentTrackIndex === popCollection.trackList.length - 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentTrackIndex === popCollection.trackList.length - 1 ? 0.5 : 1,
-                  fontSize: '1rem',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                Next ⏭️
-              </button>
-
-              <button
-                onClick={handleToggleLoop}
-                style={{
-                  padding: '0.8rem 1.2rem',
-                  background: isLooping ? 'linear-gradient(135deg, #00eaff, #00b4ff)' : 'rgba(0, 234, 255, 0.2)',
-                  border: isLooping ? '2px solid #00eaff' : '2px solid #00eaff',
-                  borderRadius: '8px',
-                  color: isLooping ? '#000' : '#00eaff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isLooping) {
-                    e.currentTarget.style.background = 'rgba(0, 234, 255, 0.4)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isLooping) {
-                    e.currentTarget.style.background = 'rgba(0, 234, 255, 0.2)';
-                  }
-                }}
-              >
-                🔁 Loop {isLooping ? 'ON' : 'OFF'}
-              </button>
-            </div>
+            <h1 className="text-2xl font-black tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              MOODWAVE
+            </h1>
           </motion.div>
 
-          {/* Track List */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+          {/* Search Bar */}
+          <motion.form
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            style={{
-              maxWidth: '900px',
-              width: '100%',
-              margin: '3rem auto 0',
-              padding: '0 2rem'
-            }}
+            onSubmit={handleSearch}
+            className="relative w-full max-w-md group"
           >
-            <h3 style={{
-              fontSize: '1.8rem',
-              marginBottom: '2rem',
-              fontWeight: 900
-            }}>
-              All Tracks
-            </h3>
+            <input
+              type="text"
+              placeholder="Search global hits (Taylor Swift, Queen...)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl py-4 pl-12 pr-6 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all backdrop-blur-md group-hover:bg-slate-800/80"
+            />
+            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+            {isSearching && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </motion.form>
+        </header>
 
-            <div style={{
-              display: 'grid',
-              gap: '1rem'
-            }}>
-              {popCollection.trackList.map((track, index) => (
+        <main className="grid lg:grid-cols-2 gap-16 items-start">
+          {/* Main Visual/Player Section */}
+          <div className="lg:sticky lg:top-16">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8 }}
+              className="relative"
+            >
+              {/* Artwork Container */}
+              <div className="relative aspect-square max-w-[320px] md:max-w-md mx-auto group">
                 <motion.div
-                  key={track.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  onClick={() => handlePlayTrack(index)}
-                  style={{
-                    padding: '1.2rem',
-                    background: currentTrackIndex === index
-                      ? 'linear-gradient(135deg, rgba(0, 234, 255, 0.3), rgba(0, 180, 255, 0.3))'
-                      : 'rgba(255, 255, 255, 0.05)',
-                    border: currentTrackIndex === index
-                      ? '2px solid #00eaff'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = currentTrackIndex === index
-                      ? 'linear-gradient(135deg, rgba(0, 234, 255, 0.4), rgba(0, 180, 255, 0.4))'
-                      : 'rgba(255, 255, 255, 0.08)';
-                    e.currentTarget.style.transform = 'translateX(8px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = currentTrackIndex === index
-                      ? 'linear-gradient(135deg, rgba(0, 234, 255, 0.3), rgba(0, 180, 255, 0.3))'
-                      : 'rgba(255, 255, 255, 0.05)';
-                    e.currentTarget.style.transform = 'translateX(0)';
-                  }}
+                  animate={{ rotate: isPlaying ? 360 : 0 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="w-full h-full rounded-full bg-slate-900 border-[12px] border-slate-800 shadow-2xl relative overflow-hidden flex items-center justify-center group-hover:border-slate-700 transition-colors"
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1.5rem',
-                    flex: 1
-                  }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: currentTrackIndex === index ? '#00eaff' : 'rgba(0, 234, 255, 0.2)',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      color: currentTrackIndex === index ? '#000' : '#00eaff'
-                    }}>
-                      {index + 1}
-                    </div>
-                    <div style={{
-                      textAlign: 'left'
-                    }}>
-                      <p style={{
-                        margin: '0',
-                        fontSize: '1.1rem',
-                        fontWeight: 600,
-                        color: currentTrackIndex === index ? '#00eaff' : '#fff'
-                      }}>
-                        {track.name}
-                      </p>
-                      <p style={{
-                        margin: '0.3rem 0 0 0',
-                        fontSize: '0.95rem',
-                        color: 'rgba(255, 255, 255, 0.6)'
-                      }}>
-                        {track.artist}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem'
-                  }}>
-                    {currentTrackIndex === index && isPlaying && (
-                      <span style={{
-                        fontSize: '1.2rem',
-                        animation: 'pulse 1s infinite'
-                      }}>
-                        🎵
-                      </span>
-                    )}
+                  {/* Vinyl Texture */}
+                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle,transparent_40%,#000_100%)]" />
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="absolute inset-0 rounded-full border border-slate-700/30 m-[5%]" style={{ margin: `${(i + 1) * 5}%` }} />
+                  ))}
+
+                  {/* Actual Track Image */}
+                  <motion.div
+                    key={currentTrack.image}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 p-[20%]"
+                  >
+                    <img
+                      src={currentTrack.image}
+                      alt={currentTrack.name}
+                      className="w-full h-full object-cover rounded-full shadow-inner"
+                    />
+                  </motion.div>
+
+                  {/* Center Label */}
+                  <div className="w-1/4 h-1/4 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 z-10 flex items-center justify-center">
+                    <div className="w-4 h-4 bg-cyan-400 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
                   </div>
                 </motion.div>
+
+                {/* Floating Note Animations */}
+                <AnimatePresence>
+                  {isPlaying && [...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 0, x: 0 }}
+                      animate={{ opacity: [0, 1, 0], y: -150, x: (i - 1) * 80 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 3, repeat: Infinity, delay: i * 0.7 }}
+                      className="absolute top-1/2 left-1/2 text-cyan-400 text-3xl pointer-events-none"
+                    >
+                      <FaMusic />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              {/* Info and Controls */}
+              <div className="mt-12 text-center">
+                <motion.div
+                  key={currentTrack.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <h2 className="text-3xl md:text-4xl font-black mb-2 tracking-tight overflow-hidden text-ellipsis px-4 text-white">
+                    {currentTrack.name}
+                  </h2>
+                  <p className="text-cyan-400 font-bold mb-8 tracking-widest uppercase text-xs flex items-center justify-center gap-2">
+                    {currentTrack.artist}
+                    {currentTrack.id.toString().startsWith('local') ? ' (Local)' : ' (Global Preview)'}
+                  </p>
+                </motion.div>
+
+                {/* Progress Slider */}
+                <div className="mb-10 px-4 max-w-md mx-auto">
+                  <div className="flex justify-between text-[10px] font-mono text-slate-500 mb-3 tracking-widest">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                  <div className="relative group h-6 flex items-center mb-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max={duration || 0}
+                      value={currentTime}
+                      onChange={handleSeek}
+                      className="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer accent-cyan-400"
+                    />
+                    <div
+                      className="absolute left-0 top-[11px] h-1 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full pointer-events-none transition-all duration-100 shadow-[0_0_10px_rgba(34,211,238,0.5)]"
+                      style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center justify-center gap-6 md:gap-10">
+                  <button
+                    onClick={() => setIsLooping(!isLooping)}
+                    className={`transition-all hover:scale-125 ${isLooping ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-600'}`}
+                  >
+                    <FaRetweet className="text-xl" />
+                  </button>
+
+                  <button
+                    onClick={handlePrevTrack}
+                    className="text-slate-400 hover:text-white transition-all hover:scale-125 active:scale-90"
+                  >
+                    <FaStepBackward className="text-2xl" />
+                  </button>
+
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 flex items-center justify-center text-3xl shadow-2xl shadow-cyan-500/40 transition-all hover:scale-110 hover:shadow-cyan-500/60 active:scale-95"
+                  >
+                    {isPlaying ? <FaPause /> : <FaPlay className="ml-1" />}
+                  </button>
+
+                  <button
+                    onClick={handleNextTrack}
+                    className="text-slate-400 hover:text-white transition-all hover:scale-125 active:scale-90"
+                  >
+                    <FaStepForward className="text-2xl" />
+                  </button>
+
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(currentTrack.name + ' ' + currentTrack.artist)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-slate-600 hover:text-red-500 transition-all hover:scale-125"
+                    title="Watch full on YouTube"
+                  >
+                    <FaChevronRight className="text-xl" />
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Playlist Section */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-slate-900/40 border border-slate-800/50 rounded-[40px] p-8 backdrop-blur-2xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+          >
+            <div className="flex justify-between items-center mb-8 px-2">
+              <h3 className="text-xl font-black text-white">
+                {searchQuery ? 'Top Results' : 'Default Playlist'}
+              </h3>
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em] bg-slate-800/50 px-3 py-1 rounded-full">{tracks.length} Tracks</span>
+            </div>
+
+            <div className="overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+              {tracks.map((track, index) => (
+                <button
+                  key={track.id}
+                  onClick={() => {
+                    setCurrentTrackIndex(index);
+                    setIsPlaying(true);
+                  }}
+                  className={`w-full flex items-center gap-5 p-4 rounded-3xl transition-all group relative overflow-hidden ${currentTrackIndex === index
+                    ? 'bg-cyan-500/10 border border-cyan-500/20'
+                    : 'hover:bg-slate-800/40 border border-transparent'
+                    }`}
+                >
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <img
+                      src={track.image}
+                      alt=""
+                      className={`w-full h-full object-cover rounded-2xl shadow-lg transition-transform duration-500 ${currentTrackIndex === index ? 'scale-110' : 'group-hover:scale-105'}`}
+                    />
+                    {currentTrackIndex === index && isPlaying && (
+                      <div className="absolute inset-0 bg-cyan-500/40 rounded-2xl flex items-center justify-center">
+                        <div className="flex gap-1 items-end h-4">
+                          <motion.div animate={{ height: [4, 12, 6, 12, 4] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1 bg-white rounded-full" />
+                          <motion.div animate={{ height: [8, 4, 12, 4, 8] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-1 bg-white rounded-full" />
+                          <motion.div animate={{ height: [6, 12, 4, 10, 6] }} transition={{ repeat: Infinity, duration: 0.5 }} className="w-1 bg-white rounded-full" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 text-left min-w-0">
+                    <h4 className={`font-bold text-sm truncate mb-1 transition-colors ${currentTrackIndex === index ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                      }`}>
+                      {track.name}
+                    </h4>
+                    <p className={`text-xs truncate transition-colors ${currentTrackIndex === index ? 'text-cyan-400' : 'text-slate-500'
+                      }`}>
+                      {track.artist}
+                    </p>
+                  </div>
+
+                  {currentTrackIndex === index && (
+                    <motion.div
+                      layoutId="active-indicator"
+                      className="absolute right-4 text-cyan-400"
+                    >
+                      <FaMusic />
+                    </motion.div>
+                  )}
+                </button>
               ))}
             </div>
-          </motion.div>
-        </section>
 
-        <footer className="footer">
-          <p>&copy; 2025 Music Collection. All rights reserved. | Enjoy your music journey!</p>
-        </footer>
+            {searchQuery && (
+              <button
+                onClick={resetToLocal}
+                className="mt-6 py-4 text-xs font-bold text-slate-500 hover:text-cyan-400 transition-colors uppercase tracking-[0.2em] border-t border-slate-800 pt-6"
+              >
+                ← Back to Local Library
+              </button>
+            )}
+          </motion.div>
+        </main>
       </div>
-    </ParallaxProvider>
+
+      {/* Start Modal */}
+      <AnimatePresence>
+        {showMusicModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 30 }}
+              className="bg-slate-900 border border-slate-800 p-10 rounded-[50px] max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] -z-10" />
+
+              <div className="w-24 h-24 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-[35px] mx-auto flex items-center justify-center shadow-2xl shadow-cyan-500/30 mb-8">
+                <FaMusic className="text-slate-950 text-4xl" />
+              </div>
+              <h3 className="text-3xl font-black mb-4 tracking-tight text-white">MOODWAVE</h3>
+              <p className="text-slate-400 mb-10 font-medium leading-relaxed">
+                Connect to millions of tracks worldwide. Ready for the experience?
+              </p>
+
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={() => { setShowMusicModal(false); setIsPlaying(true); }}
+                  className="w-full py-5 bg-white text-slate-950 font-black rounded-[25px] transition-all hover:bg-cyan-400 hover:scale-[1.02] active:scale-95 shadow-xl"
+                >
+                  START LISTENING
+                </button>
+                <button
+                  onClick={() => setShowMusicModal(false)}
+                  className="w-full py-5 bg-slate-800/50 text-slate-400 font-bold rounded-[25px] transition-all hover:bg-slate-800 hover:text-white active:scale-95"
+                >
+                  NOT NOW
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <footer className="relative z-10 border-t border-slate-900 py-16 text-center">
+        <p className="text-slate-600 text-[10px] font-black tracking-[0.4em] uppercase mb-4">
+          MOODWAVE PLAYER • GLOBAL MUSIC ENGINE
+        </p>
+        <div className="flex justify-center gap-4 text-slate-700">
+          <span>Search</span>
+          <span>•</span>
+          <span>Play</span>
+          <span>•</span>
+          <span>Discover</span>
+        </div>
+      </footer>
+    </div>
   );
 }
 
 function App() {
   return (
-    <ThemeProvider>
+    <ParallaxProvider>
       <AppContent />
-    </ThemeProvider>
+    </ParallaxProvider>
   );
 }
 
