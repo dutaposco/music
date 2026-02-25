@@ -147,9 +147,11 @@ function AppContent() {
 
     const track = tracks[currentTrackIndex];
     if (track) {
+      const wasPlaying = isPlaying;
       audio.src = track.file;
-      audio.pause();
-      setIsPlaying(false);
+      if (wasPlaying) {
+        audio.play().catch(() => setIsPlaying(false));
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrackIndex, tracks]);
@@ -167,12 +169,12 @@ function AppContent() {
 
   const handleNextTrack = () => {
     setCurrentTrackIndex(prev => (prev < tracks.length - 1 ? prev + 1 : 0));
-    setIsPlaying(false);
+    setIsPlaying(true);
   };
 
   const handlePrevTrack = () => {
     setCurrentTrackIndex(prev => (prev > 0 ? prev - 1 : tracks.length - 1));
-    setIsPlaying(false);
+    setIsPlaying(true);
   };
 
   const handleSeek = (e) => {
