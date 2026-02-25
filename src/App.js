@@ -23,7 +23,7 @@ function AppContent() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
 
-  const [showMusicModal, setShowMusicModal] = useState(true);
+
   const [tracks, setTracks] = useState(localTracks);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -32,6 +32,8 @@ function AppContent() {
   const [duration, setDuration] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [activeLibrary, setActiveLibrary] = useState('local'); // 'local' or 'global'
+  const [globalDefaults, setGlobalDefaults] = useState([]);
 
   const audioRef = useRef(null);
 
@@ -59,7 +61,8 @@ function AppContent() {
       if (searchResults.length > 0) {
         setTracks(searchResults);
         setCurrentTrackIndex(0);
-        setIsPlaying(true);
+        setIsPlaying(false);
+        setActiveLibrary('global');
       }
     } catch (error) {
       console.error("Search failed:", error);
@@ -72,7 +75,40 @@ function AppContent() {
     setTracks(localTracks);
     setCurrentTrackIndex(0);
     setSearchQuery('');
+    setActiveLibrary('local');
+    setIsPlaying(false);
   };
+
+  const switchToGlobal = () => {
+    if (searchQuery.trim() === '' && globalDefaults.length > 0) {
+      setTracks(globalDefaults);
+      setCurrentTrackIndex(0);
+    }
+    setActiveLibrary('global');
+    setIsPlaying(false);
+  };
+
+  // Fetch initial global hits
+  useEffect(() => {
+    const fetchDefaults = async () => {
+      try {
+        const response = await fetch(`https://itunes.apple.com/search?term=trending+hits&entity=song&limit=15`);
+        const data = await response.json();
+        const results = data.results.map(item => ({
+          id: item.trackId,
+          name: item.trackName,
+          artist: item.artistName,
+          file: item.previewUrl,
+          image: item.artworkUrl100.replace('100x100', '400x400'),
+          album: item.collectionName
+        }));
+        setGlobalDefaults(results);
+      } catch (e) {
+        console.error("Failed to fetch defaults", e);
+      }
+    };
+    fetchDefaults();
+  }, []);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -111,11 +147,9 @@ function AppContent() {
 
     const track = tracks[currentTrackIndex];
     if (track) {
-      const wasPlaying = isPlaying;
       audio.src = track.file;
-      if (wasPlaying) {
-        audio.play().catch(() => setIsPlaying(false));
-      }
+      audio.pause();
+      setIsPlaying(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrackIndex, tracks]);
@@ -133,12 +167,12 @@ function AppContent() {
 
   const handleNextTrack = () => {
     setCurrentTrackIndex(prev => (prev < tracks.length - 1 ? prev + 1 : 0));
-    setIsPlaying(true);
+    setIsPlaying(false);
   };
 
   const handlePrevTrack = () => {
     setCurrentTrackIndex(prev => (prev > 0 ? prev - 1 : tracks.length - 1));
-    setIsPlaying(true);
+    setIsPlaying(false);
   };
 
   const handleSeek = (e) => {
@@ -183,31 +217,50 @@ function AppContent() {
               <FaMusic className="text-slate-950 text-xl" />
             </div>
             <h1 className="text-2xl font-black tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              MOODWAVE
+              DUTAMUSIC
             </h1>
           </motion.div>
 
-          {/* Search Bar */}
-          <motion.form
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            onSubmit={handleSearch}
-            className="relative w-full max-w-md group"
-          >
-            <input
-              type="text"
-              placeholder="Search global hits (Taylor Swift, Queen...)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl py-4 pl-12 pr-6 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all backdrop-blur-md group-hover:bg-slate-800/80"
-            />
-            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
-            {isSearching && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </motion.form>
+          <div className="flex flex-col md:flex-row items-center gap-6 w-full max-w-4xl">
+            {/* Library Toggles */}
+            <div className="flex bg-slate-900/50 p-1 rounded-2xl border border-slate-800 backdrop-blur-md">
+              <button
+                onClick={resetToLocal}
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeLibrary === 'local' ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                Local
+              </button>
+              <button
+                onClick={switchToGlobal}
+                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeLibrary === 'global' ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20' : 'text-slate-400 hover:text-white'}`}
+              >
+                Global
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <motion.form
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleSearch}
+              className="relative flex-1 group"
+            >
+              <input
+                type="text"
+                placeholder="Search music..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setActiveLibrary('global')}
+                className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl py-4 pl-12 pr-6 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all backdrop-blur-md group-hover:bg-slate-800/80"
+              />
+              <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+              {isSearching && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </motion.form>
+          </div>
         </header>
 
         <main className="grid lg:grid-cols-2 gap-16 items-start">
@@ -429,53 +482,11 @@ function AppContent() {
         </main>
       </div>
 
-      {/* Start Modal */}
-      <AnimatePresence>
-        {showMusicModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: 30 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 30 }}
-              className="bg-slate-900 border border-slate-800 p-10 rounded-[50px] max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-cyan-500/10 rounded-full blur-[80px] -z-10" />
-
-              <div className="w-24 h-24 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-[35px] mx-auto flex items-center justify-center shadow-2xl shadow-cyan-500/30 mb-8">
-                <FaMusic className="text-slate-950 text-4xl" />
-              </div>
-              <h3 className="text-3xl font-black mb-4 tracking-tight text-white">MOODWAVE</h3>
-              <p className="text-slate-400 mb-10 font-medium leading-relaxed">
-                Connect to millions of tracks worldwide. Ready for the experience?
-              </p>
-
-              <div className="flex flex-col gap-4">
-                <button
-                  onClick={() => { setShowMusicModal(false); setIsPlaying(true); }}
-                  className="w-full py-5 bg-white text-slate-950 font-black rounded-[25px] transition-all hover:bg-cyan-400 hover:scale-[1.02] active:scale-95 shadow-xl"
-                >
-                  START LISTENING
-                </button>
-                <button
-                  onClick={() => setShowMusicModal(false)}
-                  className="w-full py-5 bg-slate-800/50 text-slate-400 font-bold rounded-[25px] transition-all hover:bg-slate-800 hover:text-white active:scale-95"
-                >
-                  NOT NOW
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Start Modal Removed */}
 
       <footer className="relative z-10 border-t border-slate-900 py-16 text-center">
         <p className="text-slate-600 text-[10px] font-black tracking-[0.4em] uppercase mb-4">
-          MOODWAVE PLAYER • GLOBAL MUSIC ENGINE
+          DUTAMUSIC PLAYER • GLOBAL MUSIC ENGINE
         </p>
         <div className="flex justify-center gap-4 text-slate-700">
           <span>Search</span>
