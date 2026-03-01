@@ -10,7 +10,7 @@ function formatNameFromFile(filename) {
 }
 
 // Default local collection
-const initialPopFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3', 'k.mp3', 'apocalypse.mp3', 'johnwayne.mp3', 'heavenly.mp3', 'cry .mp3', 'lovemenot.mp3', 'titik.mp3', 'spontan.mp3'];
+const initialPopFiles = ['music.mp3', 'cincin.mp3', 'letdown.mp3', 'ea.mp3', 'everythinguare.mp3', 'garammadu.mp3', 'kota.mp3', 'nggadulu.mp3', 'ophelia.mp3', 'soasu.mp3', 'tarot.mp3', 'tabolabale.mp3', 'betterwhenimdancing.mp3', 'k.mp3', 'apocalypse.mp3', 'johnwayne.mp3', 'heavenly.mp3', 'cry .mp3', 'lovemenot.mp3', 'titik.mp3', 'spontan.mp3', 'love.mp3'];
 const localTracks = initialPopFiles.map((f, i) => ({
   id: `local-${i}`,
   name: formatNameFromFile(f),
